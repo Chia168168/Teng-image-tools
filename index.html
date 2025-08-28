@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>圖片尺寸/解析度調整器 (支援 HEIC/HEIF)</title>
+<style>
+:root{--bg:#0b1020;--card:#141a2e;--muted:#9aa4b2;--accent:#5eead4;--border:#27314a;--text:#e7ecf3}
+*{box-sizing:border-box} body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC",Arial;background:linear-gradient(120deg,#0b1020,#101934 60%);color:var(--text)}
+header{padding:24px 16px;text-align:center}
+header h1{margin:0 0 8px;font-size:28px;letter-spacing:.2px}
+header p{margin:0;color:var(--muted)}
+.wrap{max-width:1000px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 6px 28px rgba(0,0,0,.35)}
+.grid{display:grid;gap:16px}
+@media(min-width:860px){.grid{grid-template-columns:360px 1fr}}
+.panel h3{margin:0 0 10px;font-size:16px;color:#dbe2ee}
+.panel label{display:block;font-size:13px;color:var(--muted);margin:8px 0 6px}
+input[type="number"], input[type="text"], select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1426;color:var(--text)}
+input[type="range"]{width:100%}
+.row{display:flex;gap:10px}
+.row > *{flex:1}
+.btn{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);background:#0f1830;color:#e7ecf3;padding:10px 14px;border-radius:12px}
+.btn:hover{border-color:#3a4a77}
+.btn.primary{background:linear-gradient(135deg,#1a2a6c,#2a4365);border-color:#39527d}
+.muted{color:var(--muted);font-size:12px}
+.drop{border:2px dashed #2b3b66;border-radius:14px;padding:18px;text-align:center;color:#c7d2fe;background:#0d1330}
+.drop.dragover{outline:2px solid var(--accent)}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.thumb{background:#0c1226;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.thumb img{width:100%;display:block}
+.thumb .meta{padding:8px 10px;font-size:12px;color:var(--muted)}
+.log{font-family:ui-monospace,Consolas,monospace;background:#0a0f22;border:1px solid var(--border);border-radius:12px;padding:10px;height:160px;overflow:auto}
+.badge{display:inline-block;background:#13203f;border:1px solid #2c3e72;color:#c9d7ff;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:6px}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/pica@8.0.0/dist/pica.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/mini.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>圖片尺寸/解析度調整器 <span class="badge">JPG · PNG · HEIC · HEIF</span></h1>
+  <p>完全在瀏覽器本機端運作，不上傳檔案。支援拖曳、多檔批次處理。</p>
+</header>
+<div class="wrap grid">
+  <section class="panel card">
+    <h3>匯入圖片</h3>
+    <div class="drop" id="drop">
+      拖曳圖片或資料夾到這裡
+      <div class="muted">支援：JPG、PNG、HEIC、HEIF、WebP…</div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <label class="btn">選擇檔案
+        <input id="fileFiles" type="file" accept="image/*,.heic,.heif" multiple style="display:none" />
+      </label>
+      <label class="btn">選擇資料夾
+        <input id="fileFolder" type="file" webkitdirectory style="display:none" />
+      </label>
+      <button class="btn" id="clear">清空清單</button>
+    </div>
+
+    <h3 style="margin-top:16px">輸出選項</h3>
+    <label>輸出格式</label>
+    <select id="format">
+      <option value="keep">維持原格式</option>
+      <option value="image/jpeg" selected>JPEG</option>
+      <option value="image/png">PNG</option>
+      <option value="image/webp">WebP</option>
+    </select>
+
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>寬度 (px)</label>
+        <input id="width" type="number" placeholder="內定 1024" />
+      </div>
+      <div>
+        <label>高度 (px)</label>
+        <input id="height" type="number" placeholder=" " />
+      </div>
+    </div>
+    <div class="row" style="align-items:center;margin-top:4px">
+      <label style="display:flex;align-items:center;gap:8px"><input id="lock" type="checkbox" checked /> 維持長寬比</label>
+      <label style="display:flex;align-items:center;gap:8px"><input id="fit" type="checkbox" checked /> 以最長邊等比縮放 (fit)</label>
+    </div>
+
+    <label style="margin-top:10px">縮放比例 (%)</label>
+    <input id="scale" type="range" min="10" max="200" value="100" />
+    <div class="muted" id="scaleLabel">100%</div>
+
+    <label style="margin-top:10px">品質 (JPEG/WebP)</label>
+    <input id="quality" type="range" min="50" max="100" value="92" />
+
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>DPI (解析度標籤，僅 JPEG 寫入 EXIF)</label>
+        <input id="dpi" type="number" placeholder="例如 300" />
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <label style="display:flex;align-items:center;gap:8px"><input id="writeDpi" type="checkbox" /> 寫入 JPEG EXIF DPI</label>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" id="process">開始處理</button>
+    </div>
+  </section>
+
+  <section class="panel card">
+    <h3>預覽 / 佇列</h3>
+    <div id="thumbs" class="thumbs" style="margin-bottom:12px"></div>
+    <h3>處理日誌</h3>
+    <div id="log" class="log"></div>
+  </section>
+</div>
+
+<script>
+const drop=document.getElementById('drop');
+const fileFiles=document.getElementById('fileFiles');
+const fileFolder=document.getElementById('fileFolder');
+const thumbs=document.getElementById('thumbs');
+const logEl=document.getElementById('log');
+const processBtn=document.getElementById('process');
+const clearBtn=document.getElementById('clear');
+const fmtSel=document.getElementById('format');
+const widthEl=document.getElementById('width');
+const heightEl=document.getElementById('height');
+const lockEl=document.getElementById('lock');
+const fitEl=document.getElementById('fit');
+const scaleEl=document.getElementById('scale');
+const scaleLabel=document.getElementById('scaleLabel');
+const qualityEl=document.getElementById('quality');
+const dpiEl=document.getElementById('dpi');
+const writeDpiEl=document.getElementById('writeDpi');
+
+const queue=[];
+const pica=window.pica({features:['js','wasm','cib']});
+
+function log(msg){ const time=new Date().toLocaleTimeString(); logEl.innerHTML+=`[${time}] ${msg}<br>`; logEl.scrollTop=logEl.scrollHeight; }
+function addThumb(src, name, w, h){
+  const div = document.createElement('div');
+  div.className = 'thumb';
+  // 縮小一半顯示
+  const img = new Image();
+  img.src = src;
+  img.style.width = '50%';  // 寬度縮小一半
+  img.style.height = 'auto';
+  div.appendChild(img);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.innerHTML = `${name}<br>${w}×${h}px`;
+  div.appendChild(meta);
+  thumbs.appendChild(div);
+}
+
+async function readAsImage(blob){ return new Promise((res,rej)=>{ const url=URL.createObjectURL(blob); const img=new Image(); img.onload=()=>{URL.revokeObjectURL(url); res(img);}; img.onerror=rej; img.src=url; }); }
+
+async function fixOrientation(imgBlob){
+  try{
+    const orientation=await exifr.orientation(imgBlob).catch(()=>null);
+    if(!orientation||orientation===1) return await readAsImage(imgBlob);
+    const img=await readAsImage(imgBlob);
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d');
+    const w=img.naturalWidth,h=img.naturalHeight;
+    if([5,6,7,8].includes(orientation)){ canvas.width=h; canvas.height=w; } else { canvas.width=w; canvas.height=h; }
+    switch(orientation){
+      case 2: ctx.translate(w,0); ctx.scale(-1,1); break;
+      case 3: ctx.translate(w,h); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(0,h); ctx.scale(1,-1); break;
+      case 5: ctx.rotate(0.5*Math.PI); ctx.scale(1,-1); break;
+      case 6: ctx.rotate(0.5*Math.PI); ctx.translate(0,-h); break;
+      case 7: ctx.rotate(0.5*Math.PI); ctx.translate(w,-h); ctx.scale(-1,1); break;
+      case 8: ctx.rotate(-0.5*Math.PI); ctx.translate(-w,0); break;
+    }
+    ctx.drawImage(img,0,0);
+    const fixed=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    return await readAsImage(fixed);
+  }catch(e){ return await readAsImage(imgBlob); }
+}
+
+function guessMime(name,original){ if(fmtSel.value!=='keep') return fmtSel.value; const ext=(name.split('.').pop()||'').toLowerCase(); const map={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif'}; return map[ext]||original||'image/jpeg'; }
+
+async function maybeDecodeHEIC(file){
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  // 嘗試讀成 Image，如果可以，就直接回傳
+  const canReadDirectly = await new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = URL.createObjectURL(file);
+  });
+  if(canReadDirectly){
+    return file; // 已經瀏覽器可讀，直接用
+  }
+
+  // 真的 HEIC 才用 heic2any
+  if(ext === 'heic' || ext === 'heif'){
+    log(`HEIC/HEIF 解碼: ${file.name}`);
+    try{
+      const blob = await heic2any({ blob: file, toType: 'image/png' });
+      return new File([blob], file.name.replace(/\.(heic|heif)$/i,'.png'), { type:'image/png' });
+    } catch(e){
+      const msg = (e && e.message) ? e.message : String(e);
+      throw new Error('HEIC 解析失敗: ' + msg);
+    }
+  }
+
+  // 其他檔案直接回傳
+  return file;
+}
+
+function calcTargetSize(srcW,srcH){
+  const scale = Number(scaleEl.value)/100;
+  let w = srcW, h = srcH;
+
+  // 先依比例縮放
+  w = Math.round(srcW * scale);
+  h = Math.round(srcH * scale);
+
+  // 取得使用者輸入的寬高
+  let iw = Number(widthEl.value || 1024); // <-- 預設寬度 1024
+  let ih = Number(heightEl.value || 0);
+
+  if(lockEl.checked){
+    const ar = srcW/srcH;
+    if(fitEl.checked){
+      if(iw && ih){
+        const ratio = Math.min(iw/srcW, ih/srcH);
+        w = Math.round(srcW * ratio); 
+        h = Math.round(srcH * ratio);
+      } else if(iw){
+        w = iw; 
+        h = Math.round(iw/ar);
+      } else if(ih){
+        h = ih; 
+        w = Math.round(ih*ar);
+      }
+    } else {
+      if(iw && !ih){ w = iw; h = Math.round(iw/ar); }
+      if(ih && !iw){ h = ih; w = Math.round(ih*ar); }
+      if(iw && ih){ w = iw; h = Math.round(iw/ar); }
+    }
+  } else {
+    if(iw) w = iw; 
+    if(ih) h = ih;
+  }
+
+  return {w: Math.max(1,w), h: Math.max(1,h)};
+}
+
+async function processFile(file){
+  try{
+    const prepared=await maybeDecodeHEIC(file);
+    const asImage=await fixOrientation(prepared);
+    const {w,h}=calcTargetSize(asImage.naturalWidth,asImage.naturalHeight);
+    const off=document.createElement('canvas'); off.width=w; off.height=h;
+    await pica.resize(asImage,off,{quality:3,alpha:true});
+    const mime=guessMime(prepared.name,prepared.type);
+    const quality=Number(qualityEl.value)/100;
+    let outBlob=await pica.toBlob(off,mime,mime.includes('jpeg')||mime.includes('webp')?quality:undefined);
+
+    const dpi=Number(dpiEl.value||0);
+    if(writeDpiEl.checked&&dpi>0&&mime==='image/jpeg'&&window.piexif){
+      const dataUrl=await blobToDataURL(outBlob);
+      const exifObj={'0th':{},'Exif':{}};
+      exifObj['0th'][piexif.ImageIFD.ResolutionUnit]=2;
+      exifObj['0th'][piexif.ImageIFD.XResolution]=[dpi,1];
+      exifObj['0th'][piexif.ImageIFD.YResolution]=[dpi,1];
+      const exifStr=piexif.dump(exifObj);
+      const inserted=piexif.insert(exifStr,dataUrl);
+      outBlob=dataURLtoBlob(inserted);
+    }
+
+    const extMap={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+    const ext=extMap[mime]||'jpg';
+    const base=file.name.replace(/\.[^.]+$/,'');
+    const outName=`${base}_${w}x${h}.${ext}`;
+
+    return {blob:outBlob,name:outName,w,h};
+  }catch(e){ log(`<span style="color:#fca5a5">錯誤：${file.name} → ${e.message||e}</span>`); return null; }
+}
+
+function blobToDataURL(blob){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); }
+function dataURLtoBlob(dataURL){ const arr=dataURL.split(','), mime=arr[0].match(/:(.*?);/)[1], bstr=atob(arr[1]); let n=bstr.length,u8=new Uint8Array(n); while(n--) u8[n]=bstr.charCodeAt(n); return new Blob([u8],{type:mime}); }
+function downloadBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000); }
+
+async function handleFiles(list){ for(const file of list){ queue.push(file); addThumb(URL.createObjectURL(file),file.name,'—','—'); } log(`加入 ${list.length} 個檔案到佇列`); }
+
+['dragenter','dragover'].forEach(evt=>drop.addEventListener(evt,e=>{e.preventDefault(); drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(evt=>drop.addEventListener(evt,e=>{e.preventDefault(); drop.classList.remove('dragover');}));
+drop.addEventListener('drop', async e=>{
+  const items=e.dataTransfer.items; const files=[];
+  for(const item of items){
+    if(item.kind==='file'){
+      const entry=item.webkitGetAsEntry&&item.webkitGetAsEntry();
+      if(entry&&entry.isDirectory){ await traverseDir(entry,files); } else { const f=item.getAsFile(); if(f) files.push(f); }
+    }
+  }
+  await handleFiles(files);
+});
+
+function traverseDir(entry,out){ return new Promise(resolve=>{ const reader=entry.createReader(); const readBatch=()=>reader.readEntries(async entries=>{ if(!entries.length) return resolve(); for(const e of entries){ if(e.isDirectory){ await traverseDir(e,out); } else { await new Promise(r=>e.file(f=>{ out.push(f); r(); })); } } readBatch(); }); readBatch(); }); }
+
+fileFiles.addEventListener('change', e=>handleFiles([...e.target.files]));
+fileFolder.addEventListener('change', e=>handleFiles([...e.target.files]));
+scaleEl.addEventListener('input', ()=>{ scaleLabel.textContent=scaleEl.value+'%'; });
+
+processBtn.addEventListener('click', async ()=>{
+  if(queue.length===0){ log('尚未選擇檔案'); return; }
+  log(`開始處理 ${queue.length} 個檔案…`);
+  const results=[];
+  for(const f of queue){ const r=await processFile(f); if(r) results.push(r); }
+
+  if(results.length===1){ downloadBlob(results[0].blob,results[0].name); log(`完成：${results[0].name}`); }
+  else if(results.length>1){
+    const zip=new JSZip();
+    results.forEach(r=>zip.file(r.name,r.blob));
+    const content=await zip.generateAsync({type:'blob'});
+    saveAs(content,'images.zip');
+    log('全部完成 ✅ (已打包 ZIP)');
+  }
+});
+
+clearBtn.addEventListener('click', ()=>{ queue.length=0; thumbs.innerHTML=''; log('已清空佇列'); });
+</script>
+</body>
+</html>
