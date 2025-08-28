@@ -92,7 +92,8 @@ input[type="range"]{width:100%}
     <div class="muted" id="scaleLabel">100%</div>
 
     <label style="margin-top:10px">品質 (JPEG/WebP)</label>
-    <input id="quality" type="range" min="50" max="100" value="92" />
+    <input id="quality" type="range" min="50" max="100" value="100" />
+    <div class="muted" id="qualityLabel">100%</div>
 
     <div class="row" style="margin-top:10px">
       <div>
@@ -133,6 +134,7 @@ const fitEl=document.getElementById('fit');
 const scaleEl=document.getElementById('scale');
 const scaleLabel=document.getElementById('scaleLabel');
 const qualityEl=document.getElementById('quality');
+const qualityLabel=document.getElementById('qualityLabel');
 const dpiEl=document.getElementById('dpi');
 const writeDpiEl=document.getElementById('writeDpi');
 
@@ -309,6 +311,7 @@ function traverseDir(entry,out){ return new Promise(resolve=>{ const reader=entr
 fileFiles.addEventListener('change', e=>handleFiles([...e.target.files]));
 fileFolder.addEventListener('change', e=>handleFiles([...e.target.files]));
 scaleEl.addEventListener('input', ()=>{ scaleLabel.textContent=scaleEl.value+'%'; });
+qualityEl.addEventListener('input', ()=>{ qualityLabel.textContent=qualityEl.value+'%'; });
 
 processBtn.addEventListener('click', async ()=>{
   if(queue.length===0){ log('尚未選擇檔案'); return; }
@@ -330,3 +333,4 @@ clearBtn.addEventListener('click', ()=>{ queue.length=0; thumbs.innerHTML=''; lo
 </script>
 </body>
 </html>
+
