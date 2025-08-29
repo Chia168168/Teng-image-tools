@@ -1,4 +1,36 @@
 <!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Resizer & Base64 Tool</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .tabs { display: flex; justify-content: center; margin-bottom: 20px; }
+    .tab { padding: 10px 20px; cursor: pointer; border: 1px solid #ccc; margin: 0 5px; }
+    .tab.active { background: #007bff; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    textarea { width: 100%; height: 150px; }
+    img.preview { max-width: 100%; max-height: 200px; display: block; margin: 10px auto; }
+    button { margin: 5px; }
+    progress { width: 100%; margin: 10px 0; }
+    .preview-container { display: flex; flex-wrap: wrap; gap: 10px; }
+    .preview-item { border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center; }
+    .preview-item img { max-width: 100%; max-height: 100px; display: block; margin: 5px auto; }
+  </style>
+</head>
+<body>
+  <h1>Teng Image Tools</h1>
+
+  <!-- 分頁切換 -->
+  <div class="tabs">
+    <div class="tab active" data-tab="resizer">尺寸格式調整</div>
+    <div class="tab" data-tab="base64">Base64轉換</div>
+  </div>
+
+  <!-- 圖片尺寸調整區塊 -->
+  <div id="resizer" class="tab-content active">
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8" />
@@ -124,7 +156,6 @@ input[type="range"]{width:100%}
     </div>
 
     <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-
     </div>
   </section>
 
@@ -349,6 +380,127 @@ processBtn.addEventListener('click', async ()=>{
 
 clearBtn.addEventListener('click', ()=>{ queue.length=0; thumbs.innerHTML=''; log('已清空佇列'); });
 </script>
+</body>
+  </div>
+
+  <!-- Base64 工具 -->
+  <div id="base64" class="tab-content">
+<header>
+  <h2>圖片 ➝ Base64</h2>
+    <input type="file" id="imgToBase64" accept="image/*">
+    <button onclick="downloadBase64()">下載 Base64 txt</button>
+    <textarea id="base64Output" placeholder="這裡會顯示 Base64 編碼"></textarea>
+    <br>
+    <img id="previewBase64Img" class="preview">
+
+    <hr>
+
+    <h2>Base64 ➝ 圖片</h2>
+    <textarea id="base64Input" placeholder="貼上 Base64 字串"></textarea>
+    <input type="file" id="base64File" accept=".txt">
+
+    <button onclick="convertBase64ToImage()">轉換並預覽</button>
+    <a id="downloadRestored" style="display:none" download="restored.png">下載圖片</a>
+    <br>
+    <img id="restoredImg" class="preview">
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
+  <script>
+    // 分頁切換
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(tab.dataset.tab).classList.add("active");
+      });
+    });
+
+    // ========== 圖片尺寸調整功能 ==========
+    const upload = document.getElementById("upload");
+    const preview = document.getElementById("preview");
+    const progressBar = document.getElementById("progressBar");
+    const formatSelect = document.getElementById("format");
+
+    upload.addEventListener("change", async function(e) {
+      preview.innerHTML = "";
+      const files = Array.from(e.target.files);
+      let completed = 0;
+      for (const file of files) {
+        try {
+          let blob = file;
+          if (file.type === "image/heic" || file.name.endsWith(".heic")) {
+            blob = await heic2any({ blob: file, toType: "image/jpeg" });
+          }
+          const imgURL = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const scale = 1024 / img.width;
+            canvas.width = 1024;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const outputFormat = formatSelect.value;
+            const resizedURL = canvas.toDataURL(outputFormat, 0.9);
+
+            const div = document.createElement("div");
+            div.className = "preview-item";
+            div.innerHTML = `
+              <img src="${resizedURL}">
+              <p>${canvas.width}×${canvas.height}px</p>
+              <a href="${resizedURL}" download="${file.name.split('.')[0]}.jpg">下載</a>
+            `;
+            preview.appendChild(div);
+
+            completed++;
+            progressBar.value = (completed / files.length) * 100;
+          };
+          img.src = imgURL;
+        } catch (err) {
+          console.error("轉換失敗：", file.name, err);
+        }
+      }
+    });
+
+    document.getElementById("downloadAll").addEventListener("click", () => {
+      document.querySelectorAll("#preview a").forEach(a => a.click());
+    });
+
+    // ========== Base64 工具 ==========
+    document.getElementById("imgToBase64").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const base64 = evt.target.result;
+        document.getElementById("base64Output").value = base64;
+        document.getElementById("previewBase64Img").src = base64;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function downloadBase64() {
+      const text = document.getElementById("base64Output").value;
+      if (!text) return alert("沒有可下載的 Base64 資料");
+      const blob = new Blob([text], {type: "text/plain"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "image_base64.txt";
+      link.click();
+    }
+
+    function convertBase64ToImage() {
+      const base64 = document.getElementById("base64Input").value.trim();
+      if (!base64) return alert("請貼上 Base64 字串");
+      document.getElementById("restoredImg").src = base64;
+      const link = document.getElementById("downloadRestored");
+      link.href = base64;
+      link.style.display = "inline-block";
+    }
+  </script>
 </body>
 </html>
 
