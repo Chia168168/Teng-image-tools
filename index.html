@@ -43,7 +43,7 @@ input[type="range"]{width:100%}
 </head>
 <body>
 <header>
-  <h1>圖片尺寸/解析度調整器 <span class="badge">JPG · PNG · HEIC · HEIF</span></h1>
+  <h1>TENG 圖片尺寸/格式調整器 <span class="badge">JPG · PNG · HEIC · HEIF · WEBP</span></h1>
   <p>完全在瀏覽器本機端運作，不上傳檔案。支援拖曳、多檔批次處理。</p>
 </header>
 <div class="wrap grid">
@@ -61,8 +61,10 @@ input[type="range"]{width:100%}
         <input id="fileFolder" type="file" webkitdirectory style="display:none" />
       </label>
       <button class="btn" id="clear">清空清單</button>
-    </div>
+      </label>
+      <button class="btn primary" id="process">開始處理</button>
 
+    </div>
     <h3 style="margin-top:16px">輸出選項</h3>
     <label>輸出格式</label>
     <select id="format">
@@ -75,12 +77,28 @@ input[type="range"]{width:100%}
     <div class="row" style="margin-top:10px">
       <div>
         <label>寬度 (px)</label>
-        <input id="width" type="number" placeholder="內定 1024" />
+        <select id="width">
+          <option value="0" selected>原尺寸</option>
+          <option value="512">512</option>
+          <option value="768">768</option>
+          <option value="1024">1024</option>
+          <option value="1280">1280</option>
+        </select>
+        <input id="width" type="number" placeholder=" " />
       </div>
+
       <div>
         <label>高度 (px)</label>
+        <select id="height">
+          <option value="0" selected>原尺寸</option>
+          <option value="512">512</option>
+          <option value="768">768</option>
+          <option value="1024">1024</option>
+          <option value="1280">1280</option>
+        </select>
         <input id="height" type="number" placeholder=" " />
       </div>
+
     </div>
     <div class="row" style="align-items:center;margin-top:4px">
       <label style="display:flex;align-items:center;gap:8px"><input id="lock" type="checkbox" checked /> 維持長寬比</label>
@@ -92,8 +110,8 @@ input[type="range"]{width:100%}
     <div class="muted" id="scaleLabel">100%</div>
 
     <label style="margin-top:10px">品質 (JPEG/WebP)</label>
-    <input id="quality" type="range" min="50" max="100" value="100" />
-    <div class="muted" id="qualityLabel">100%</div>
+    <input id="quality" type="range" min="50" max="100" value="90" />
+    <div class="muted" id="qualityLabel">90%</div>
 
     <div class="row" style="margin-top:10px">
       <div>
@@ -333,4 +351,5 @@ clearBtn.addEventListener('click', ()=>{ queue.length=0; thumbs.innerHTML=''; lo
 </script>
 </body>
 </html>
+
 
